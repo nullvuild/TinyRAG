@@ -73,8 +73,8 @@ class TinyRAG:
         if n_results is None:
             n_results = self.settings["search"]["default_n_results"]
         
-        # 유사도 임계값 설정 (0.1로 낮춤 - 더 많은 결과 포함)
-        similarity_threshold = 0.1
+        # 유사도 임계값 설정 (0.01로 더 낮춤 - 더 많은 결과 포함)
+        similarity_threshold = 0.01
             
         try:
             # 쿼리 임베딩 생성
@@ -170,8 +170,8 @@ class TinyRAG:
                     max_similarity = max(similarities)
                     avg_similarity = sum(similarities) / len(similarities)
                     
-                    # 고품질 결과 비율 계산 (유사도 0.3 이상으로 낮춤)
-                    high_quality_count = sum(1 for s in similarities if s >= 0.3)
+                    # 고품질 결과 비율 계산 (유사도 0.1 이상으로 더 낮춤)
+                    high_quality_count = sum(1 for s in similarities if s >= 0.1)
                     quality_ratio = high_quality_count / len(similarities)
                     
                     # 컬렉션 점수 = (최고 유사도 * 0.5) + (평균 유사도 * 0.5) (품질 비율 제거)
@@ -198,15 +198,15 @@ class TinyRAG:
                         break
                     
                     # 상위 컬렉션은 더 많이, 하위 컬렉션은 적게 선택
-                    if score_info['score'] >= 0.4:  # 고품질 컬렉션 (임계값 낮춤)
+                    if score_info['score'] >= 0.2:  # 고품질 컬렉션 (임계값 더 낮춤)
                         take_count = min(3, remaining_slots, len(collection_results_sorted))
-                    elif score_info['score'] >= 0.2:  # 중품질 컬렉션 (임계값 낮춤)
+                    elif score_info['score'] >= 0.1:  # 중품질 컬렉션 (임계값 더 낮춤)
                         take_count = min(2, remaining_slots, len(collection_results_sorted))
                     else:  # 저품질 컬렉션
                         take_count = min(1, remaining_slots, len(collection_results_sorted))
                     
-                    # 유사도가 0.15 이상인 결과만 선택 (임계값 낮춤)
-                    quality_results = [r for r in collection_results_sorted if r['similarity'] >= 0.15]
+                    # 유사도가 0.05 이상인 결과만 선택 (임계값 더 낮춤)
+                    quality_results = [r for r in collection_results_sorted if r['similarity'] >= 0.05]
                     if quality_results:
                         selected_results.extend(quality_results[:take_count])
                     else:  # 품질 결과가 없으면 최소한 1개는 선택

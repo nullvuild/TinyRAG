@@ -12,7 +12,7 @@
     "chroma_db": "./chroma_db"
   },
   "search": {
-    "default_n_results": 3,
+    "default_n_results": 5,
     "chunk_size": 300,
     "overlap": 50,
     "large_doc_chunk_size": 500,
