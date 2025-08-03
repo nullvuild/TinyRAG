@@ -1,0 +1,22 @@
+{
+  "embedding_model": {
+    "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+    "local_path": "./models/all-MiniLM-L6-v2"
+  },
+  "ollama": {
+    "url": "http://localhost:11434",
+    "model_name": "exaone3.5:latest"
+  },
+  "paths": {
+    "docs_folder": "./docs",
+    "chroma_db": "./chroma_db"
+  },
+  "search": {
+    "default_n_results": 3,
+    "chunk_size": 300,
+    "overlap": 50,
+    "large_doc_chunk_size": 500,
+    "large_doc_overlap": 75,
+    "large_doc_threshold": 100000
+  }
+}

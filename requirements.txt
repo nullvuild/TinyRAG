@@ -1,0 +1,19 @@
+# 핵심 RAG 시스템 의존성
+chromadb>=0.4.24
+sentence-transformers>=2.2.0
+requests>=2.28.0
+
+# 딥러닝 프레임워크
+torch>=1.11.0
+numpy>=1.21.0
+
+# 다양한 문서 형식 지원 (선택적)
+markitdown>=0.0.1a2  # Microsoft의 통합 문서 변환 라이브러리
+PyPDF2>=3.0.1
+PyMuPDF>=1.23.0
+python-docx>=1.1.0
+openpyxl>=3.1.0
+python-pptx>=0.6.21
+
+# 추가 유틸리티
+tqdm>=4.64.0
