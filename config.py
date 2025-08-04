@@ -19,7 +19,8 @@ def get_default_settings():
     return {
         "embedding_model": {
             "model_name": "sentence-transformers/all-MiniLM-L6-v2",
-            "local_path": "./models/all-MiniLM-L6-v2"
+            "local_path": "./models/all-MiniLM-L6-v2",
+            "batch_size": 1000
         },
         "ollama": {
             "url": "http://localhost:11434",

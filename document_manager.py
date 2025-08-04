@@ -432,57 +432,96 @@ class DocumentProcessor:
         chunks, metadata = self.split_text(text, chunk_size=chunk_size, overlap=overlap)
         print(f"텍스트를 {len(chunks)}개 청크로 분할했습니다.")
         
-        # 임베딩 생성
-        print("임베딩 생성 중...")
-        
-        # 배치 크기 설정 (모델의 최대 배치 크기보다 작게)
-        max_batch_size = 1000  # 안전한 배치 크기
-        embeddings = []
-        
-        # 청크를 배치 단위로 나누어 처리
-        for i in range(0, len(chunks), max_batch_size):
-            batch_chunks = chunks[i:i+max_batch_size]
-            batch_size = len(batch_chunks)
-            
-            print(f"   배치 {i//max_batch_size + 1}/{(len(chunks) + max_batch_size - 1)//max_batch_size} 처리 중... ({batch_size}개 청크)")
-            
-            # 배치별 임베딩 생성
-            batch_embeddings = self.model.encode(batch_chunks, show_progress_bar=False)
-            embeddings.extend(batch_embeddings)
-        
-        print(f"✅ 총 {len(embeddings)}개 청크의 임베딩 생성 완료")
-        
-        # ChromaDB에 저장
-        print("ChromaDB에 저장 중...")
+        # ChromaDB에 저장하면서 개별적으로 임베딩 생성
+        print("청크별 임베딩 생성 및 저장 중...")
         
         # 문서 ID 생성 (파일명 기반)
         doc_name = os.path.basename(document_path)
         doc_id_base = doc_name.replace('.', '_')
         
-        ids = [f"{doc_id_base}_chunk_{i}" for i in range(len(chunks))]
+        # 청크를 개별적으로 처리하여 ChromaDB에 저장
+        batch_size = self.settings["embedding_model"].get("batch_size", 1000)  # 설정에서 가져오거나 기본값 사용
+        total_processed = 0
         
-        # 메타데이터에 문서 정보 추가
-        enhanced_metadata = []
-        for i, meta in enumerate(metadata):
-            meta.update({
-                "document_name": doc_name,
-                "document_path": document_path,
-                "encoding": encoding,
-                "chunk_text_preview": chunks[i][:100] + "..." if len(chunks[i]) > 100 else chunks[i]
-            })
-            enhanced_metadata.append(meta)
+        print(f"배치 크기: {batch_size}개씩 처리합니다.")
         
-        # 컬렉션에 추가
-        collection.add(
-            embeddings=[emb.tolist() if hasattr(emb, 'tolist') else emb for emb in embeddings],
-            documents=chunks,
-            metadatas=enhanced_metadata,
-            ids=ids
-        )
+        for i in range(0, len(chunks), batch_size):
+            batch_chunks = chunks[i:i+batch_size]
+            batch_metadata = metadata[i:i+batch_size]
+            current_batch_size = len(batch_chunks)
+            
+            print(f"   배치 {i//batch_size + 1}/{(len(chunks) + batch_size - 1)//batch_size} 처리 중... ({current_batch_size}개 청크)")
+            
+            try:
+                # 배치별 임베딩 생성
+                batch_embeddings = self.model.encode(batch_chunks, show_progress_bar=False)
+                
+                # 배치별 ID 및 메타데이터 생성
+                batch_ids = [f"{doc_id_base}_chunk_{i+j}" for j in range(current_batch_size)]
+                
+                # 메타데이터에 문서 정보 추가
+                enhanced_batch_metadata = []
+                for j, meta in enumerate(batch_metadata):
+                    meta.update({
+                        "document_name": doc_name,
+                        "document_path": document_path,
+                        "encoding": encoding,
+                        "chunk_text_preview": batch_chunks[j][:100] + "..." if len(batch_chunks[j]) > 100 else batch_chunks[j]
+                    })
+                    enhanced_batch_metadata.append(meta)
+                
+                # ChromaDB에 배치 추가
+                collection.add(
+                    embeddings=[emb.tolist() if hasattr(emb, 'tolist') else emb for emb in batch_embeddings],
+                    documents=batch_chunks,
+                    metadatas=enhanced_batch_metadata,
+                    ids=batch_ids
+                )
+                
+                total_processed += current_batch_size
+                print(f"     ✅ {current_batch_size}개 청크 저장 완료 (총 {total_processed}/{len(chunks)})")
+                
+            except Exception as e:
+                print(f"     ❌ 배치 {i//batch_size + 1} 처리 중 오류: {e}")
+                
+                # 개별 청크로 다시 시도
+                print(f"     🔄 개별 청크 처리로 재시도...")
+                for j, chunk in enumerate(batch_chunks):
+                    try:
+                        # 개별 임베딩 생성
+                        embedding = self.model.encode([chunk], show_progress_bar=False)[0]
+                        
+                        # 개별 ID 및 메타데이터
+                        chunk_id = f"{doc_id_base}_chunk_{i+j}"
+                        chunk_meta = batch_metadata[j].copy()
+                        chunk_meta.update({
+                            "document_name": doc_name,
+                            "document_path": document_path,
+                            "encoding": encoding,
+                            "chunk_text_preview": chunk[:100] + "..." if len(chunk) > 100 else chunk
+                        })
+                        
+                        # ChromaDB에 개별 추가
+                        collection.add(
+                            embeddings=[embedding.tolist() if hasattr(embedding, 'tolist') else embedding],
+                            documents=[chunk],
+                            metadatas=[chunk_meta],
+                            ids=[chunk_id]
+                        )
+                        
+                        total_processed += 1
+                        
+                    except Exception as inner_e:
+                        print(f"       ⚠️ 청크 {i+j+1} 스킵 (오류: {inner_e})")
+                        continue
+        
+        print(f"✅ 총 {total_processed}개 청크 처리 완료")
+        
+        # ChromaDB에 저장 완료 메시지 (기존 저장 로직 제거)
         
         print(f"✅ '{collection_name}' 컬렉션 생성 완료!")
         print(f"   - 문서: {doc_name}")
-        print(f"   - 청크 수: {len(chunks)}")
+        print(f"   - 처리된 청크 수: {total_processed}")
         print(f"   - 인코딩: {encoding}")
         
         return collection
